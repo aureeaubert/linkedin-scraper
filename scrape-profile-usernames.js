@@ -48,31 +48,8 @@ const scrapeProfileUsernames = async (
   await puppeteerPage.goto(searchUrl.href);
   await puppeteerPage.waitForSelector('.search-results-page');
 
-  // Scroll to the bottom of the page to load all results
-  // await puppeteerPage.evaluate(async () => {
-  //   await new Promise((resolve) => {
-  //     let totalHeight = 0;
-  //     const distance = 100;
-  //     const timer = setInterval(() => {
-  //       const { scrollHeight } = document.body;
-  //       window.scrollBy(0, distance);
-  //       totalHeight += distance;
-  //       if (totalHeight >= scrollHeight) {
-  //         clearInterval(timer);
-  //         resolve();
-  //       }
-  //     }, 100);
-  //   });
-
-  //   // window.scrollBy(0, 1200);
-  // });
-
-  // await puppeteerPage.waitFor(2000);
-
   // Retrieve profile usernames in the current page
   const pageUsernames = await puppeteerPage.evaluate(scrapePageProfileUsernamesEvaluator);
-
-  await puppeteerPage.waitFor(40000);
 
   // If we don't find new usernames, return current usernames list
   if (!pageUsernames || pageUsernames.length === 0) {
@@ -99,8 +76,8 @@ const run = async () => {
   const puppeteerBrowser = await puppeteer.launch({
     headless: false,
     defaultViewport: {
-      width: 5000,
-      height: 5000,
+      width: 1000,
+      height: 3000,
     },
   });
 

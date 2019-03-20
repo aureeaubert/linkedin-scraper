@@ -99,6 +99,8 @@ const run = async () => {
   const usernamesStr = fs.readFileSync('./profile-usernames.csv', 'utf8');
   const usernames = usernamesStr.split(',');
 
+  // TODO
+
   // Scrape all profiles from the given usernames list
   const results = await scrapeProfiles(puppeteerBrowser, usernames);
 
