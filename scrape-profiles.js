@@ -3,6 +3,25 @@ const Promise = require('bluebird');
 const puppeteer = require('puppeteer');
 
 /**
+ * Read file
+ */
+const readFile = (filename, encoding) => {
+  try {
+    return fs.readFileSync(filename, encoding);
+  }
+  catch (e) {
+    return null;
+  }
+};
+
+/**
+ * Write file
+ */
+const writeFile = (filename, object) => {
+  fs.writeFileSync(filename, JSON.stringify(object, null, 2));
+};
+
+/**
  * Login to LinkedIn
  */
 const loginToLinkedIn = async (puppeteerBrowser, sessionCookie) => {
@@ -30,6 +49,8 @@ const loginToLinkedIn = async (puppeteerBrowser, sessionCookie) => {
  */
 const scrapePageProfileEvaluator = () => {
   const profileResult = {};
+
+  profileResult.name = document.querySelector(".pv-top-card-section__name").innerText;
 
   const jobInfoElement = document.querySelector('.profile-detail .pv-profile-section__section-info .pv-profile-section__list-item .pv-entity__summary-info');
 
@@ -92,20 +113,27 @@ const run = async () => {
   // Script params
   const sessionCookie = process.argv[2];
 
+  // Read results in a file
+  const oldResultsStr = readFile('./profiles.json', 'utf8');
+  const usernamesDataStr = readFile('./profile-usernames.json', 'utf8');
+
+  const oldResults = JSON.parse(oldResultsStr || '[]');
+  const usernamesData = JSON.parse(usernamesDataStr);
+  const usernames = usernamesData.results.slice(
+    usernamesData.offset,
+    usernamesData.offset + usernamesData.limit
+  );
+  usernamesData.offset = usernamesData.offset + usernamesData.limit;
+
   // Login to LinkedIn
   await loginToLinkedIn(puppeteerBrowser, sessionCookie);
 
-  // Read results in a file
-  const usernamesStr = fs.readFileSync('./profile-usernames.csv', 'utf8');
-  const usernames = usernamesStr.split(',');
-
-  // TODO
-
   // Scrape all profiles from the given usernames list
-  const results = await scrapeProfiles(puppeteerBrowser, usernames);
+  const newResults = await scrapeProfiles(puppeteerBrowser, usernames);
 
   // Write results in a file
-  fs.writeFileSync('./profiles.json', JSON.stringify(results, null, 2));
+  writeFile('./profiles.json', oldResults.concat(newResults));
+  writeFile('./profile-usernames.json', usernamesData);
 
   await puppeteerBrowser.close();
 };

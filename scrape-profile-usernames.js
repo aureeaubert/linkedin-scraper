@@ -1,5 +1,6 @@
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { URL } = require("url");
 
 /**
  * Login to LinkedIn
@@ -101,7 +102,14 @@ const run = async () => {
   console.log('Results ->', usernames);
 
   // Write results in a file
-  fs.writeFileSync('./profile-usernames.csv', usernames);
+  fs.writeFileSync(
+    './profile-usernames.json',
+    JSON.stringify(
+      { results: usernames, offset: 0, limit: 500 },
+      null,
+      2
+    )
+  );
 
   await puppeteerPage.close();
   await puppeteerBrowser.close();
