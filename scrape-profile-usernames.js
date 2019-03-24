@@ -1,26 +1,7 @@
-const fs = require('fs');
 const puppeteer = require('puppeteer');
-const { URL } = require("url");
+const { URL } = require('url');
 
-/**
- * Login to LinkedIn
- */
-const loginToLinkedIn = async (puppeteerPage, sessionCookie) => {
-  console.log('Login to LinkedIn');
-
-  await puppeteerPage.setCookie({
-    name: 'li_at',
-    value: sessionCookie,
-    domain: 'www.linkedin.com',
-  });
-
-  await puppeteerPage.goto('https://www.linkedin.com/feed/');
-
-  // If we're redirect to the login page, session cookie is not valid
-  if (/www.linkedin.com\/m\/login/.test(puppeteerPage.url())) {
-    throw new Error("Can't sign in with this session cookie");
-  }
-};
+const { loginToLinkedIn, writeInFile } = require('./utils');
 
 /**
  * Function to evaluate to return all usernames in the page
@@ -74,7 +55,7 @@ const scrapeProfileUsernames = async (
 
 const run = async () => {
   // Initialize puppeteer
-  const puppeteerBrowser = await puppeteer.launch({
+  const browser = await puppeteer.launch({
     headless: false,
     defaultViewport: {
       width: 1000,
@@ -90,29 +71,24 @@ const run = async () => {
   const sessionCookie = process.argv[2];
   const searchUrl = new URL(process.argv[3]);
 
-  // Browser puppeteer page
-  const puppeteerPage = await puppeteerBrowser.newPage();
-
   // Login to LinkedIn
-  await loginToLinkedIn(puppeteerPage, sessionCookie);
+  await loginToLinkedIn(browser, sessionCookie);
 
   // Scrape all profile usernames from the given search URL
-  const usernames = await scrapeProfileUsernames(puppeteerPage, searchUrl);
+  const page = await browser.newPage();
+  const usernames = await scrapeProfileUsernames(page, searchUrl);
 
   console.log('Results ->', usernames);
 
   // Write results in a file
-  fs.writeFileSync(
+  writeInFile(
     './profile-usernames.json',
-    JSON.stringify(
-      { results: usernames, offset: 0, limit: 500 },
-      null,
-      2
-    )
+    { results: usernames, offset: 0, limit: 200 },
   );
 
-  await puppeteerPage.close();
-  await puppeteerBrowser.close();
+  // Close browser
+  await page.close();
+  await browser.close();
 };
 
 run();
