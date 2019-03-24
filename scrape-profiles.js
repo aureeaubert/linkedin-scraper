@@ -1,7 +1,7 @@
 const Promise = require('bluebird');
 const puppeteer = require('puppeteer');
 
-const { loginToLinkedIn, readFile, writeFile } = require('./utils');
+const { loginToLinkedIn, readFile, writeInFile } = require('./utils');
 
 /**
  * Function to evaluate to return all profile info
@@ -9,7 +9,7 @@ const { loginToLinkedIn, readFile, writeFile } = require('./utils');
 const scrapePageProfileEvaluator = () => {
   const profileResult = {};
 
-  profileResult.name = document.querySelector('.pv-top-card-section__name').innerText;
+  profileResult.name = document.querySelector('.pv-top-card-section__name').innerText.trim();
 
   const jobInfoElement = document.querySelector('.profile-detail .pv-profile-section__section-info .pv-profile-section__list-item .pv-entity__summary-info');
 
@@ -31,38 +31,57 @@ const scrapePageProfileEvaluator = () => {
 };
 
 /**
+ * Scrape a LinkedIn profile from a given username
+ */
+const scrapeProfile = async (
+  browser,
+  username,
+) => {
+  const linkedin = `https://www.linkedin.com/in/${username}/`;
+
+  try {
+    const page = await browser.newPage();
+    const pageUrl = `https://www.linkedin.com/in/${username}/detail/contact-info/`;
+
+    console.log(`Scrape page ${pageUrl}`);
+
+    await page.goto(pageUrl);
+    await page.waitForSelector('#artdeco-modal-outlet');
+
+    const profileResult = await page.evaluate(scrapePageProfileEvaluator);
+    profileResult.linkedin = linkedin;
+
+    await page.close();
+
+    console.log(`Found ${JSON.stringify(profileResult, null, 2)}`);
+
+    return profileResult;
+  } catch (e) {
+    console.error(`Fail to scrape profile ${username}`);
+    return { linkedin };
+  }
+};
+
+/**
  * Scrape all profiles from a list of usernames
  */
 const scrapeProfiles = async (
   browser,
   usernames,
-) => Promise.map(usernames, async (username) => {
-  const page = await browser.newPage();
-  const pageUrl = `https://www.linkedin.com/in/${username}/detail/contact-info/`;
-
-  console.log(`Scrape page ${pageUrl}`);
-
-  await page.goto(pageUrl);
-  await page.waitForSelector('#artdeco-modal-outlet');
-  await page.evaluate(() => {
-    window.scrollBy(0, 1200);
-  });
-  await page.waitForSelector('.profile-detail .pv-profile-section__section-info .pv-profile-section__list-item');
-
-  const profileResult = await page.evaluate(scrapePageProfileEvaluator);
-  profileResult.linkedin = `https://www.linkedin.com/in/${username}/`;
-
-  await page.close();
-
-  console.log(`Found ${JSON.stringify(profileResult, null, 2)}`);
-
-  return profileResult;
-}, { concurrency: 4 });
+) => Promise.map(
+  usernames,
+  username => scrapeProfile(browser, username),
+  { concurrency: 4 },
+);
 
 const run = async () => {
   // Initialize puppeteer
   const browser = await puppeteer.launch({
     headless: true,
+    defaultViewport: {
+      width: 1000,
+      height: 1000,
+    },
   });
 
   if (!process.argv[2]) {
@@ -91,8 +110,8 @@ const run = async () => {
   const newResults = await scrapeProfiles(browser, usernames);
 
   // Write results in a file
-  writeFile('./profiles.json', oldResults.concat(newResults));
-  writeFile('./profile-usernames.json', usernamesData);
+  writeInFile('./profiles.json', oldResults.concat(newResults));
+  writeInFile('./profile-usernames.json', usernamesData);
 
   await browser.close();
 };

@@ -1,93 +1,90 @@
 const puppeteer = require('puppeteer');
-const { URL } = require('url');
 
 const { loginToLinkedIn, writeInFile } = require('./utils');
 
 /**
  * Function to evaluate to return all usernames in the page
  */
-const scrapePageProfileUsernamesEvaluator = () => Array.from(
-  document.querySelectorAll('.search-result__info .search-result__result-link'),
-).map(userElement => (
-  userElement.href.match(/www.linkedin.com\/in\/(.*)\//)[1]
-));
+const extractUsernames = () => {
+  return Array.from(
+    document.querySelectorAll('.mn-connection-card .mn-connection-card__link'),
+  ).map((userElement) => {
+    // Get "username" in "/in/username/"
+    return userElement.href.match(/\/in\/(.*)\//)[1];
+  });
+};
 
 /**
- * Find all usernames by browsing search pages recursively
+ * Find all usernames in the page with infinite scroll loading
  */
-const scrapeProfileUsernames = async (
-  puppeteerPage,
-  searchUrl,
-  pageIndex = 1,
-  usernamesResults = [],
-) => {
-  // Set page number query param in the search URL
-  searchUrl.searchParams.set('page', pageIndex);
-
-  console.info(`Scrape page ${searchUrl}`);
-
-  // Go and wait the results page
-  await puppeteerPage.goto(searchUrl.href);
-  await puppeteerPage.waitForSelector('.search-results-page');
-
+const scrapeProfileUsernamesWithScroll = async (page, pageNumber) => {
   // Retrieve profile usernames in the current page
-  const pageUsernames = await puppeteerPage.evaluate(scrapePageProfileUsernamesEvaluator);
+  const usernames = await page.evaluate(extractUsernames);
 
-  // If we don't find new usernames, return current usernames list
-  if (!pageUsernames || pageUsernames.length === 0) {
-    console.log(`No username found on page ${searchUrl}`);
-    return usernamesResults;
+  // If all usernames aren't loaded
+  if (pageNumber > 0) {
+    // Scroll down to load more results
+    console.log(`${usernames.length} results loaded, load more...`);
+    const previousHeight = await page.evaluate('document.body.scrollHeight');
+    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+    await page.waitForFunction(`document.body.scrollHeight > ${previousHeight}`);
+    await page.waitFor(() => !document.querySelector('.mn-connections .loader'));
+    return scrapeProfileUsernamesWithScroll(page, pageNumber - 1);
   }
 
-  console.log(`Found ${pageUsernames.length} usernames on page ${searchUrl}:`, pageUsernames);
+  return usernames;
+};
 
-  // Current usernames list + new usernames found
-  const newUsernamesResults = [...usernamesResults, ...pageUsernames];
+/**
+ * Find all usernames in the page
+ */
+const scrapeProfileUsernames = async (browser) => {
+  const page = await browser.newPage();
 
-  // Scrape the next page
-  return scrapeProfileUsernames(
-    puppeteerPage,
-    searchUrl,
-    pageIndex + 1,
-    newUsernamesResults,
-  );
+  // Go and wait the connections page
+  await page.goto('https://www.linkedin.com/mynetwork/invite-connect/connections/');
+  await page.waitForSelector('.mn-connections__header');
+
+  // Retrieve connections total count
+  const connectionsCount = await page.evaluate(() => {
+    const connectionsHeaderText = document.querySelector('.mn-connections__header').innerText;
+    return Number(connectionsHeaderText.split(' ')[0]);
+  });
+
+  // Scrape results
+  const results = await scrapeProfileUsernamesWithScroll(page, connectionsCount / 40);
+
+  await page.close();
+
+  return results;
 };
 
 const run = async () => {
   // Initialize puppeteer
   const browser = await puppeteer.launch({
-    headless: false,
-    defaultViewport: {
-      width: 1000,
-      height: 3000,
-    },
+    headless: true,
   });
 
-  if (!process.argv[2] || !process.argv[3]) {
-    throw new Error('Missing input params');
+  if (!process.argv[2]) {
+    throw new Error('Missing session cookie param');
   }
-
-  // Script params
   const sessionCookie = process.argv[2];
-  const searchUrl = new URL(process.argv[3]);
 
   // Login to LinkedIn
   await loginToLinkedIn(browser, sessionCookie);
 
-  // Scrape all profile usernames from the given search URL
-  const page = await browser.newPage();
-  const usernames = await scrapeProfileUsernames(page, searchUrl);
+  // Launch scraping
+  const usernames = await scrapeProfileUsernames(browser);
 
   console.log('Results ->', usernames);
 
   // Write results in a file
   writeInFile(
     './profile-usernames.json',
-    { results: usernames, offset: 0, limit: 200 },
+    { results: usernames, offset: 0, limit: 100 },
   );
 
   // Close browser
-  await page.close();
   await browser.close();
 };
 

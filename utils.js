@@ -3,7 +3,7 @@ const fs = require('fs');
 /**
  * Read file content
  */
-export const readFile = (filename, encoding) => {
+const readFile = (filename, encoding) => {
   try {
     return fs.readFileSync(filename, encoding);
   } catch (e) {
@@ -14,14 +14,14 @@ export const readFile = (filename, encoding) => {
 /**
  * Write a given object in a file
  */
-export const writeInFile = (filename, object) => {
+const writeInFile = (filename, object) => {
   fs.writeFileSync(filename, JSON.stringify(object, null, 2));
 };
 
 /**
  * Login to LinkedIn
  */
-export const loginToLinkedIn = async (browser, sessionCookie) => {
+const loginToLinkedIn = async (browser, sessionCookie) => {
   console.log('Login to LinkedIn');
 
   const page = await browser.newPage();
@@ -39,4 +39,10 @@ export const loginToLinkedIn = async (browser, sessionCookie) => {
   }
 
   await page.close();
+};
+
+module.exports = {
+  readFile,
+  writeInFile,
+  loginToLinkedIn,
 };
