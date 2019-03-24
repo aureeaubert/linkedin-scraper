@@ -48,7 +48,8 @@ const scrapeProfileUsernames = async (browser) => {
   // Retrieve connections total count
   const connectionsCount = await page.evaluate(() => {
     const connectionsHeaderText = document.querySelector('.mn-connections__header').innerText;
-    return Number(connectionsHeaderText.split(' ')[0]);
+    const stringCount = connectionsHeaderText.split(' ')[0].replace(",", "");
+    return Number(stringCount);
   });
 
   // Scrape results
@@ -62,7 +63,7 @@ const scrapeProfileUsernames = async (browser) => {
 const run = async () => {
   // Initialize puppeteer
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: false,
   });
 
   if (!process.argv[2]) {
