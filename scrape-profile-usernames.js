@@ -48,7 +48,7 @@ const scrapeProfileUsernames = async (browser) => {
   // Retrieve connections total count
   const connectionsCount = await page.evaluate(() => {
     const connectionsHeaderText = document.querySelector('.mn-connections__header').innerText;
-    const stringCount = connectionsHeaderText.split(' ')[0].replace(",", "");
+    const stringCount = connectionsHeaderText.replace(/\D+/g, ''); 
     return Number(stringCount);
   });
 
